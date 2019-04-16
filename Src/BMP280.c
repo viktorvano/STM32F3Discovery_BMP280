@@ -9,7 +9,7 @@
 signed long temperature_raw, pressure_raw;
 unsigned short dig_T1, dig_P1;
 signed short dig_T2, dig_T3, dig_P2, dig_P3, dig_P4, dig_P5, dig_P6, dig_P7, dig_P8, dig_P9;
-float temperature, pressure, altitude;
+float temperature, pressure, altitude, init_height;
 #include <math.h>
 #include "stm32f3xx_hal.h"
 I2C_HandleTypeDef hi2c1;
@@ -110,5 +110,5 @@ volatile	double p=1048576.0-(double)pressure_raw;
 
 	temperature=T;
 	pressure=p;
-	altitude=((powf(101325.0/pressure, 1/5.257f)-1)*(temperature+273.15f))/0.0065f;
+	altitude=44330.0f*(1-powf(pressure/101325.0f,1.0f/5.255f));//altitude=((powf(101325.0/pressure, 1/5.257f)-1)*(temperature+273.15f))/0.0065f;
 }

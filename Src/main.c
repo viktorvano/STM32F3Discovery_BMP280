@@ -52,6 +52,8 @@
 
 /* USER CODE BEGIN Includes */
 #include "BMP280.h"
+#include <string.h>
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -61,8 +63,7 @@ TIM_HandleTypeDef htim3;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-uint8_t USB_allow=0;
-uint8_t volatile bufferUSB[20];
+uint8_t volatile USB_allow=0;
 extern uint8_t CDC_Transmit_FS1(uint8_t* Buf, uint16_t Len);
 /* USER CODE END PV */
 
@@ -90,6 +91,100 @@ uint8_t string_compare(char array1[], char array2[], uint16_t lenght)
 	 if (comVAR==lenght)
 		 	return 1;
 	 else 	return 0;
+}
+
+// reverses a string 'str' of length 'len'
+void reverse(char *str, int len)
+{
+    int i=0, j=len-1, temp;
+    while (i<j)
+    {
+        temp = str[i];
+        str[i] = str[j];
+        str[j] = temp;
+        i++; j--;
+    }
+}
+
+ // Converts a given integer x to string str[].  d is the number
+ // of digits required in output. If d is more than the number
+ // of digits in x, then 0s are added at the beginning.
+int intToStr(int x, char str[], int d)
+{
+    int i = 0;
+    while (x)
+    {
+        str[i++] = (x%10) + '0';
+        x = x/10;
+    }
+
+    // If number of digits required is more, then
+    // add 0s at the beginning
+    while (i < d)
+        str[i++] = '0';
+
+    reverse(str, i);
+    str[i] = '\0';
+    return i;
+}
+
+// Converts a floating point number to string.
+void ftoa(float n, char *res, int afterpoint)
+{
+	unsigned char minus_flag = 0;
+	if(n<0)
+	{
+		minus_flag = 1;
+		n = -n;
+	}
+
+    // Extract integer part
+    int ipart = (int)n;
+
+    // Extract floating part
+    float fpart = n - (float)ipart;
+
+    // convert integer part to string
+    int i = intToStr(ipart, res, 0);
+
+    // check for display option after point
+    if (afterpoint != 0)
+    {
+        res[i] = '.';  // add dot
+
+        // Get the value of fraction part upto given no.
+        // of points after dot. The third parameter is needed
+        // to handle cases like 233.007
+        fpart = fpart * pow(10, afterpoint);
+
+        intToStr((int)fpart, res + i + 1, afterpoint);
+    }
+
+    char string[30];
+    if(minus_flag==1)
+    {
+        memset(string, 0, 30);
+        string[0]='-';
+        if(n<1.0f)
+        {
+        	string[1]='0';
+        	strcpy(&string[2], res);
+        }else
+        	strcpy(&string[1], res);
+
+        memset(res, 0, strlen(res));
+        strcpy(res, string);
+    }else
+    if(n<1.0f)
+	{
+		string[0]='0';
+		strcpy(&string[1], res);
+		memset(res, 0, strlen(res));
+		strcpy(res, string);
+	}
+
+
+
 }
 /* USER CODE END 0 */
 
@@ -123,14 +218,12 @@ int main(void)
   MX_TIM3_Init();
 
   /* USER CODE BEGIN 2 */
-  volatile uint8_t i=0;
-  for(i=0;i<20;i++)
-    	bufferUSB[i]='\n';
+  char string[200];
   HAL_Delay(2000);
   USB_allow=1;
   BMP280_init();
-  volatile uint32_t decimals, fractions;
-  unsigned char buffer[20];
+  BMP280_calc_values();
+  init_height=altitude;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -141,74 +234,28 @@ int main(void)
 
   /* USER CODE BEGIN 3 */
 	  BMP280_calc_values();
-	  decimals=(uint32_t)temperature;
-	  for(i=0;i<20;i++)
-	    	buffer[i]='\n';
-	  itoa(decimals,&buffer[0],10);
-	  for(i=0;buffer[i]!='\n';i++);
-	  CDC_Transmit_FS1(buffer, i-1);
-	  HAL_Delay(30);
-	  buffer[0]='.';
-	  CDC_Transmit_FS1(buffer, 1);
-	  HAL_Delay(30);
-	  fractions=(temperature-((float)(decimals)))*1000.0f;
-	  for(i=0;i<20;i++)
-	    	buffer[i]='\n';
-	  itoa(fractions,&buffer[0],10);
-	  for(i=0;buffer[i]!='\n';i++);
-	  CDC_Transmit_FS1(buffer, i-1);
-	  HAL_Delay(30);
-	  buffer[0]='C';
-	  buffer[1]='\n';
-	  CDC_Transmit_FS1(buffer, 2);
-	  HAL_Delay(30);
+	  if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0))
+		  init_height=altitude;
 
-	  decimals=(uint32_t)pressure;
-	  for(i=0;i<20;i++)
-	    	buffer[i]='\n';
-	  itoa(decimals,&buffer[0],10);
-	  for(i=0;buffer[i]!='\n';i++);
-	  CDC_Transmit_FS1(buffer, i-1);
-	  HAL_Delay(30);
-	  buffer[0]='.';
-	  CDC_Transmit_FS1(buffer, 1);
-	  HAL_Delay(30);
-	  fractions=(pressure-((float)(decimals)))*1000.0f;
-	  for(i=0;i<20;i++)
-	    	buffer[i]='\n';
-	  itoa(fractions,&buffer[0],10);
-	  for(i=0;buffer[i]!='\n';i++);
-	  CDC_Transmit_FS1(buffer, i-1);
-	  HAL_Delay(30);
-	  buffer[0]='P';
-	  buffer[1]='a';
-	  buffer[2]='\n';
-	  CDC_Transmit_FS1(buffer, 3);
-	  HAL_Delay(30);
+	  memset(&string, 0, strlen(string));
 
-	  decimals=(uint32_t)altitude;
-	  for(i=0;i<20;i++)
-	    	buffer[i]='\n';
-	  itoa(decimals,&buffer[0],10);
-	  for(i=0;buffer[i]!='\n';i++);
-	  CDC_Transmit_FS1(buffer, i-1);
-	  HAL_Delay(30);
-	  buffer[0]='.';
-	  CDC_Transmit_FS1(buffer, 1);
-	  HAL_Delay(30);
-	  fractions=(altitude-((float)(decimals)))*1000.0f;
-	  for(i=0;i<20;i++)
-	    	buffer[i]='\n';
-	  itoa(fractions,&buffer[0],10);
-	  for(i=0;buffer[i]!='\n';i++);
-	  CDC_Transmit_FS1(buffer, i-1);
-	  HAL_Delay(30);
-	  buffer[0]='m';
-	  buffer[1]='\n';
-	  buffer[2]='\n';
-	  CDC_Transmit_FS1(buffer, 3);
-	  HAL_Delay(30);
+	  strcat(string, "Temperature: ");
+	  ftoa(temperature, &string[strlen(string)], 3);
+	  strcat(string, " C\n");
 
+	  strcat(string, "Pressure: ");
+	  ftoa(pressure, &string[strlen(string)], 3);
+	  strcat(string, " Pa\n");
+
+	  strcat(string, "Altitude: ");
+	  ftoa(altitude, &string[strlen(string)], 3);
+	  strcat(string, " m\n");
+
+	  strcat(string, "Relative altitude: ");
+	  ftoa(altitude-init_height, &string[strlen(string)], 3);
+	  strcat(string, " m\n\n\n");
+
+	  CDC_Transmit_FS1((uint8_t*)&string, strlen(string));
 	  HAL_Delay(1000);
   }
   /* USER CODE END 3 */

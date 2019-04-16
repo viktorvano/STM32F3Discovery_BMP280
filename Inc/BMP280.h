@@ -13,7 +13,7 @@
 extern signed long temperature_raw, pressure_raw;
 extern unsigned short dig_T1, dig_P1;
 extern signed short dig_T2, dig_T3, dig_P2, dig_P3, dig_P4, dig_P5, dig_P6, dig_P7, dig_P8, dig_P9;
-extern float temperature, pressure, altitude;
+extern float temperature, pressure, altitude, init_height;
 
 extern uint8_t I2C_Read_Register(uint8_t device_adr, uint8_t internal_adr);
 
